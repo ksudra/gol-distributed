@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net"
 	"net/rpc"
+	"sync"
 	"time"
 
 	"uk.ac.bris.cs/gameoflife/stubs"
@@ -13,7 +14,10 @@ import (
 
 type GameOfLife struct{}
 
-func (g *GameOfLife) GOL(request stubs.GameReq, response *stubs.GameRes) {
+var aliveCount int
+var turn int
+
+func (g *GameOfLife) GOL(request stubs.GameReq, response *stubs.GameRes) (err error) {
 	tempWorld := make([][]byte, len(request.World))
 	for i := range request.World {
 		tempWorld[i] = make([]byte, len(request.World[i]))
@@ -21,10 +25,13 @@ func (g *GameOfLife) GOL(request stubs.GameReq, response *stubs.GameRes) {
 	}
 	for i := 0; i < request.Turns; i++ {
 		tempWorld = calculateNextState(request.Width, request.Height, request.Threads, tempWorld)
+		turn = i
+		aliveCount = len(calculateAliveCells(tempWorld))
 	}
 	response.World = tempWorld
 	response.CompletedTurns = request.Turns
 	response.Alive = calculateAliveCells(tempWorld)
+	return
 }
 
 func calculateNextState(width int, height int, threads int, world [][]byte) [][]byte {
@@ -34,37 +41,25 @@ func calculateNextState(width int, height int, threads int, world [][]byte) [][]
 		copy(tempWorld[i], world[i])
 	}
 
-	for y := range tempWorld {
-		for x := range tempWorld[y] {
-			count := countNeighbours(width, height, x, y, world)
+	var wg sync.WaitGroup
+	var remainder sync.WaitGroup
 
-			if world[y][x] == 255 && (count < 2 || count > 3) {
-				tempWorld[y][x] = 0
-			} else if world[y][x] == 0 && count == 3 {
-				tempWorld[y][x] = 255
-			}
-		}
+	for i := 0; i < threads; i++ {
+		start := i * (height - height%threads) / threads
+		end := start + (height-height%threads)/threads
+		wg.Add(1)
+		go worker(&wg, width, height, start, end, tempWorld, world)
+
+	}
+	wg.Wait()
+
+	if height%threads > 0 {
+		start := height - height%threads
+		remainder.Add(1)
+		go worker(&remainder, width, height, start, height, tempWorld, world)
 	}
 
-	//var wg sync.WaitGroup
-	//var remainder sync.WaitGroup
-	//
-	//for i := 0; i < threads; i++ {
-	//	start := i * (height - height%threads) / threads
-	//	end := start + (height-height%threads)/threads
-	//	wg.Add(1)
-	//	go worker(&wg, width, height, start, end, tempWorld, world)
-	//
-	//}
-	//wg.Wait()
-	//
-	//if height%threads > 0 {
-	//	start := height - height%threads
-	//	remainder.Add(1)
-	//	go worker(&remainder, width, height, start, height, tempWorld, world)
-	//}
-	//
-	//remainder.Wait()
+	remainder.Wait()
 
 	return tempWorld
 }
@@ -92,21 +87,21 @@ func countNeighbours(width int, height int, x int, y int, world [][]uint8) int {
 	return count
 }
 
-//func worker(wg *sync.WaitGroup, width int, height int, start int, end int, newWorld [][]byte, world [][]byte) {
-//	defer wg.Done()
-//
-//	for y := start; y < end; y++ {
-//		for x := range newWorld {
-//			count := countNeighbours(width, height, x, y, world)
-//
-//			if world[y][x] == 255 && (count < 2 || count > 3) {
-//				newWorld[y][x] = 0
-//			} else if world[y][x] == 0 && count == 3 {
-//				newWorld[y][x] = 255
-//			}
-//		}
-//	}
-//}
+func worker(wg *sync.WaitGroup, width int, height int, start int, end int, newWorld [][]byte, world [][]byte) {
+	defer wg.Done()
+
+	for y := start; y < end; y++ {
+		for x := range newWorld {
+			count := countNeighbours(width, height, x, y, world)
+
+			if world[y][x] == 255 && (count < 2 || count > 3) {
+				newWorld[y][x] = 0
+			} else if world[y][x] == 0 && count == 3 {
+				newWorld[y][x] = 255
+			}
+		}
+	}
+}
 
 func calculateAliveCells(world [][]byte) []util.Cell {
 	var cells []util.Cell
@@ -120,23 +115,24 @@ func calculateAliveCells(world [][]byte) []util.Cell {
 	return cells
 }
 
+func (g *GameOfLife) getAlive(request stubs.AliveReq, response *stubs.AliveRes) (err error) {
+	response.Turn = turn
+	response.Alive = aliveCount
+	return
+}
+
 func main() {
 	pAddr := flag.String("port", "8030", "Port to listen on")
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
-	err := rpc.Register(GameOfLife{})
+	err := rpc.Register(&GameOfLife{})
 	if err != nil {
 		return
 	}
 
 	listener, _ := net.Listen("tcp", ":"+*pAddr)
 
-	defer func(listener net.Listener) {
-		err := listener.Close()
-		if err != nil {
-
-		}
-	}(listener)
+	defer listener.Close()
 	rpc.Accept(listener)
 
 }

@@ -4,8 +4,8 @@ import (
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
-var NextState = "GameOfLife.calculateNextState"
 var RunGame = "GameOfLife.GOL"
+var GetAlive = "GameOfLife.getAlive"
 
 type GameReq struct {
 	Width   int

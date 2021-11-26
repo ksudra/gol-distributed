@@ -1,9 +1,11 @@
 package gol
 
 import (
+	"fmt"
 	"net/rpc"
 	"strconv"
 	"strings"
+	"time"
 	"uk.ac.bris.cs/gameoflife/stubs"
 )
 
@@ -21,14 +23,18 @@ type GameOfLife struct{}
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
 	world := buildWorld(p, c)
+	ticker := time.NewTicker(2 * time.Second)
 	// TODO: Create a 2D slice to store the world.
 
 	turn := 0
 	server := "127.0.0.1:8030"
 	client, _ := rpc.Dial("tcp", server)
 
-	makeCall(client, p, c, world, turn)
 	defer client.Close()
+
+	getAliveCells(ticker, c, client)
+	makeCall(client, p, c, world, turn)
+
 	// TODO: Execute all turns of the Game of Life.
 
 	// TODO: Report the final state using FinalTurnCompleteEvent.
@@ -56,6 +62,27 @@ func buildWorld(p Params, c distributorChannels) [][]uint8 {
 	}
 
 	return world
+}
+
+func getAliveCells(ticker *time.Ticker, c distributorChannels, client *rpc.Client) {
+	for {
+		select {
+		case <-ticker.C:
+			request := stubs.AliveReq{}
+			response := new(stubs.AliveRes)
+			err := client.Call(stubs.GetAlive, request, response)
+			if err != nil {
+				fmt.Println("client.Call error in getAliveCells")
+				fmt.Println(err)
+			}
+
+			c.events <- AliveCellsCount{
+				CompletedTurns: response.Turn,
+				CellsCount:     response.Alive,
+			}
+
+		}
+	}
 }
 
 func makeCall(client *rpc.Client, p Params, c distributorChannels, world [][]uint8, completedTurns int) {
