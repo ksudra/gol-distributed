@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"math/rand"
 	"net"
 	"net/rpc"
@@ -16,6 +17,7 @@ type GameOfLife struct{}
 
 var aliveCount int
 var turn int
+var mutex = &sync.Mutex{}
 
 func (g *GameOfLife) GOL(request stubs.GameReq, response *stubs.GameRes) (err error) {
 	tempWorld := make([][]byte, len(request.World))
@@ -29,7 +31,7 @@ func (g *GameOfLife) GOL(request stubs.GameReq, response *stubs.GameRes) (err er
 		aliveCount = len(calculateAliveCells(tempWorld))
 	}
 	response.World = tempWorld
-	response.CompletedTurns = request.Turns
+	response.CompletedTurns = request.Turns + 1
 	response.Alive = calculateAliveCells(tempWorld)
 	return
 }
@@ -115,9 +117,12 @@ func calculateAliveCells(world [][]byte) []util.Cell {
 	return cells
 }
 
-func (g *GameOfLife) getAlive(request stubs.AliveReq, response *stubs.AliveRes) (err error) {
+func (g *GameOfLife) getNumAlive(request stubs.AliveReq, response *stubs.AliveRes) (err error) {
+	mutex.Lock()
 	response.Turn = turn
 	response.Alive = aliveCount
+	fmt.Println(aliveCount)
+	mutex.Unlock()
 	return
 }
 

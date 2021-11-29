@@ -1,7 +1,6 @@
 package gol
 
 import (
-	"fmt"
 	"net/rpc"
 	"strconv"
 	"strings"
@@ -32,8 +31,9 @@ func distributor(p Params, c distributorChannels) {
 
 	defer client.Close()
 
-	getAliveCells(ticker, c, client)
+	go getAliveCells(ticker, c, client)
 	makeCall(client, p, c, world, turn)
+	ticker.Stop()
 
 	// TODO: Execute all turns of the Game of Life.
 
@@ -70,12 +70,7 @@ func getAliveCells(ticker *time.Ticker, c distributorChannels, client *rpc.Clien
 		case <-ticker.C:
 			request := stubs.AliveReq{}
 			response := new(stubs.AliveRes)
-			err := client.Call(stubs.GetAlive, request, response)
-			if err != nil {
-				fmt.Println("client.Call error in getAliveCells")
-				fmt.Println(err)
-			}
-
+			client.Call(stubs.AliveCells, request, response)
 			c.events <- AliveCellsCount{
 				CompletedTurns: response.Turn,
 				CellsCount:     response.Alive,
