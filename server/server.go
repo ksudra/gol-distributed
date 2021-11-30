@@ -17,7 +17,8 @@ type GameOfLife struct{}
 
 var aliveCount int
 var turn int
-var mutex = &sync.Mutex{}
+
+//var mutex = &sync.Mutex{}
 
 func (g *GameOfLife) GOL(request stubs.GameReq, response *stubs.GameRes) (err error) {
 	tempWorld := make([][]byte, len(request.World))
@@ -27,11 +28,13 @@ func (g *GameOfLife) GOL(request stubs.GameReq, response *stubs.GameRes) (err er
 	}
 	for i := 0; i < request.Turns; i++ {
 		tempWorld = calculateNextState(request.Width, request.Height, request.Threads, tempWorld)
+		//mutex.Lock()
 		turn = i
 		aliveCount = len(calculateAliveCells(tempWorld))
+		//mutex.Unlock()
 	}
 	response.World = tempWorld
-	response.CompletedTurns = request.Turns + 1
+	response.CompletedTurns = request.Turns
 	response.Alive = calculateAliveCells(tempWorld)
 	return
 }
@@ -118,11 +121,11 @@ func calculateAliveCells(world [][]byte) []util.Cell {
 }
 
 func (g *GameOfLife) getNumAlive(request stubs.AliveReq, response *stubs.AliveRes) (err error) {
-	mutex.Lock()
+	//mutex.Lock()
 	response.Turn = turn
 	response.Alive = aliveCount
 	fmt.Println(aliveCount)
-	mutex.Unlock()
+	//mutex.Unlock()
 	return
 }
 

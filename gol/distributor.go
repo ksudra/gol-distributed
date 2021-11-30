@@ -1,6 +1,7 @@
 package gol
 
 import (
+	"fmt"
 	"net/rpc"
 	"strconv"
 	"strings"
@@ -64,13 +65,27 @@ func buildWorld(p Params, c distributorChannels) [][]uint8 {
 	return world
 }
 
+func sendWorld(p Params, c distributorChannels, world [][]byte, turn int) {
+	c.ioCommand <- ioOutput
+	c.ioFilename <- strings.Join([]string{strconv.Itoa(p.ImageWidth), strconv.Itoa(p.ImageHeight), strconv.Itoa(turn)}, "x")
+	for y := range world {
+		for x := range world[y] {
+			c.ioOutput <- world[y][x]
+		}
+	}
+}
+
 func getAliveCells(ticker *time.Ticker, c distributorChannels, client *rpc.Client) {
 	for {
 		select {
 		case <-ticker.C:
 			request := stubs.AliveReq{}
 			response := new(stubs.AliveRes)
-			client.Call(stubs.AliveCells, request, response)
+			err := client.Call(stubs.AliveCells, request, response)
+			if err != nil {
+				fmt.Println("client.Call error in getAliveCells")
+				fmt.Println(err)
+			}
 			c.events <- AliveCellsCount{
 				CompletedTurns: response.Turn,
 				CellsCount:     response.Alive,
@@ -93,6 +108,7 @@ func makeCall(client *rpc.Client, p Params, c distributorChannels, world [][]uin
 	client.Call(stubs.RunGame, request, response)
 
 	completedTurns = response.CompletedTurns
+	sendWorld(p, c, response.World, response.CompletedTurns)
 	c.events <- FinalTurnComplete{
 		CompletedTurns: response.CompletedTurns,
 		Alive:          response.Alive,
