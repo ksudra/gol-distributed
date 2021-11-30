@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net"
 	"net/rpc"
+	"os"
 	"sync"
 	"time"
 
@@ -31,10 +32,11 @@ func (g *GameOfLife) GOL(request stubs.GameReq, response *stubs.GameRes) (err er
 		turn = i
 		board = tempWorld
 		tempWorld = calculateNextState(request.Width, request.Height, request.Threads, tempWorld)
-		//if shut {
-		//	time.Sleep(200 * time.Millisecond)
-		//	os.Exit(0)
-		//}
+		if shut {
+			time.Sleep(200 * time.Millisecond)
+			os.Exit(0)
+		}
+
 	}
 	response.World = tempWorld
 	response.CompletedTurns = request.Turns

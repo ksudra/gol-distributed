@@ -3,11 +3,11 @@ package gol
 import (
 	"fmt"
 	"net/rpc"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 	"uk.ac.bris.cs/gameoflife/stubs"
-	"uk.ac.bris.cs/gameoflife/util"
 )
 
 type distributorChannels struct {
@@ -22,7 +22,7 @@ type distributorChannels struct {
 type GameOfLife struct{}
 
 // distributor divides the work between workers and interacts with other goroutines.
-func distributor(p Params, c distributorChannels) {
+func distributor(p Params, c distributorChannels, keyPress <-chan rune) {
 	world := buildWorld(p, c)
 	ticker := time.NewTicker(2 * time.Second)
 	// TODO: Create a 2D slice to store the world.
@@ -34,6 +34,7 @@ func distributor(p Params, c distributorChannels) {
 	defer client.Close()
 
 	go getAliveCells(ticker, c, client)
+	go keyPresses(keyPress, p, c, client)
 	makeCall(client, p, c, world, turn)
 	ticker.Stop()
 
@@ -60,10 +61,6 @@ func buildWorld(p Params, c distributorChannels) [][]uint8 {
 		world[y] = make([]uint8, p.ImageWidth)
 		for x := range world[y] {
 			world[y][x] = <-c.ioInput
-			c.events <- CellFlipped{
-				CompletedTurns: 0,
-				Cell:           util.Cell{X: x, Y: y},
-			}
 		}
 	}
 
@@ -115,10 +112,10 @@ func changeState(state int, client *rpc.Client, newState State, c distributorCha
 	}
 }
 
-func keyPresses(keyChan <-chan rune, p Params, c distributorChannels, client *rpc.Client) {
+func keyPresses(key <-chan rune, p Params, c distributorChannels, client *rpc.Client) {
 	for {
 		select {
-		case keyPress := <-keyChan:
+		case keyPress := <-key:
 			switch keyPress {
 			case 's':
 				request := stubs.BoardReq{}
@@ -130,13 +127,15 @@ func keyPresses(keyChan <-chan rune, p Params, c distributorChannels, client *rp
 				sendWorld(p, c, response.World, response.Turn)
 			case 'q':
 				changeState(0, client, Quitting, c)
+				time.Sleep(200 * time.Millisecond)
+				os.Exit(0)
 				return
 			case 'p':
 				changeState(1, client, Paused, c)
 				for {
-					keyPress = <-keyChan
+					keyPress = <-key
 					for keyPress != 'p' {
-						keyPress = <-keyChan
+						keyPress = <-key
 					}
 					fmt.Println("Continuing")
 					changeState(2, client, Executing, c)
@@ -157,6 +156,8 @@ func keyPresses(keyChan <-chan rune, p Params, c distributorChannels, client *rp
 				if err != nil {
 					fmt.Println(err)
 				}
+				time.Sleep(200 * time.Millisecond)
+				os.Exit(0)
 				return
 			}
 		default:
