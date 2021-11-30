@@ -83,7 +83,6 @@ func getAliveCells(ticker *time.Ticker, c distributorChannels, client *rpc.Clien
 			response := new(stubs.AliveRes)
 			err := client.Call(stubs.AliveCells, request, response)
 			if err != nil {
-				fmt.Println("client.Call error in getAliveCells")
 				fmt.Println(err)
 			}
 			c.events <- AliveCellsCount{
@@ -105,7 +104,10 @@ func makeCall(client *rpc.Client, p Params, c distributorChannels, world [][]uin
 	}
 
 	response := new(stubs.GameRes)
-	client.Call(stubs.RunGame, request, response)
+	err := client.Call(stubs.RunGame, request, response)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	completedTurns = response.CompletedTurns
 	sendWorld(p, c, response.World, response.CompletedTurns)
