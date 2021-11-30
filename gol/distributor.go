@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 	"uk.ac.bris.cs/gameoflife/stubs"
+	"uk.ac.bris.cs/gameoflife/util"
 )
 
 type distributorChannels struct {
@@ -54,18 +55,22 @@ func buildWorld(p Params, c distributorChannels) [][]uint8 {
 	c.ioCommand <- ioInput
 	c.ioFilename <- strings.Join([]string{strconv.Itoa(p.ImageWidth), strconv.Itoa(p.ImageHeight)}, "x")
 
-	world := make([][]byte, p.ImageHeight)
+	world := make([][]uint8, p.ImageHeight)
 	for y := range world {
-		world[y] = make([]byte, p.ImageWidth)
+		world[y] = make([]uint8, p.ImageWidth)
 		for x := range world[y] {
 			world[y][x] = <-c.ioInput
+			c.events <- CellFlipped{
+				CompletedTurns: 0,
+				Cell:           util.Cell{X: x, Y: y},
+			}
 		}
 	}
 
 	return world
 }
 
-func sendWorld(p Params, c distributorChannels, world [][]byte, turn int) {
+func sendWorld(p Params, c distributorChannels, world [][]uint8, turn int) {
 	c.ioCommand <- ioOutput
 	c.ioFilename <- strings.Join([]string{strconv.Itoa(p.ImageWidth), strconv.Itoa(p.ImageHeight), strconv.Itoa(turn)}, "x")
 	for y := range world {
@@ -92,6 +97,75 @@ func getAliveCells(ticker *time.Ticker, c distributorChannels, client *rpc.Clien
 
 		}
 	}
+}
+
+func changeState(state State, client *rpc.Client, newState State, c distributorChannels) {
+	request := stubs.ChangeStateReq{
+		State: state,
+	}
+	response := new(stubs.ChangeStateRes)
+	err := client.Call(stubs.ChangeState, request, response)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	c.events <- StateChange{
+		CompletedTurns: response.Turn,
+		NewState:       newState,
+	}
+
+	state = newState
+}
+
+func keyPresses(keyChan <-chan rune, p Params, c distributorChannels, client *rpc.Client) {
+	for {
+		select {
+		case keyPress := <-keyChan:
+			switch keyPress {
+			case 's':
+				request := stubs.BoardReq{}
+				response := new(stubs.BoardRes)
+				err := client.Call(stubs.GetBoard, request, response)
+				if err != nil {
+					fmt.Println(err)
+				}
+				sendWorld(p, c, response.World, response.Turn)
+			case 'q':
+				changeState(0, client, Quitting, c)
+				return
+			case 'p':
+				changeState(1, client, Paused, c)
+				for {
+					keyPress = <-keyChan
+					for keyPress != 'p' {
+						keyPress = <-keyChan
+					}
+					fmt.Println("Continuing")
+					changeState(2, client, Executing, c)
+					break
+				}
+			case 'k':
+				request := stubs.BoardReq{}
+				response := new(stubs.BoardRes)
+				err := client.Call(stubs.GetBoard, request, response)
+				if err != nil {
+					fmt.Println(err)
+				}
+				sendWorld(p, c, response.World, response.Turn)
+
+				req := stubs.CloseReq{}
+				res := new(stubs.CloseRes)
+				err = client.Call(stubs.ShutDown, req, res)
+				if err != nil {
+					fmt.Println(err)
+				}
+				return
+			}
+		default:
+			break
+		}
+	}
+
 }
 
 func makeCall(client *rpc.Client, p Params, c distributorChannels, world [][]uint8, completedTurns int) {

@@ -1,11 +1,15 @@
 package stubs
 
 import (
+	"uk.ac.bris.cs/gameoflife/gol"
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
 var RunGame = "GameOfLife.GOL"
 var AliveCells = "GameOfLife.GetNumAlive"
+var ChangeState = "GameOfLife.StateChange"
+var GetBoard = "GameOfLife.GetBoard"
+var ShutDown = "GameOfLife.ShutDown"
 
 type GameReq struct {
 	Width   int
@@ -33,11 +37,19 @@ type NextStateRes struct {
 	World [][]uint8
 }
 
-type StateReq struct{}
+type BoardReq struct{}
 
-type StateRes struct {
+type BoardRes struct {
 	Turn  int
-	world [][]uint8
+	World [][]uint8
+}
+
+type ChangeStateReq struct {
+	State gol.State
+}
+
+type ChangeStateRes struct {
+	Turn int
 }
 
 type AliveReq struct{}
@@ -45,6 +57,13 @@ type AliveReq struct{}
 type AliveRes struct {
 	Turn  int
 	Alive int
+}
+
+type CellReq struct{}
+
+type CellRes struct {
+	Turn int
+	Cell util.Cell
 }
 
 type CloseReq struct{}

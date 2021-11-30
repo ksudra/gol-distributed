@@ -7,6 +7,7 @@ import (
 	"net/rpc"
 	"sync"
 	"time"
+	"uk.ac.bris.cs/gameoflife/gol"
 
 	"uk.ac.bris.cs/gameoflife/stubs"
 	"uk.ac.bris.cs/gameoflife/util"
@@ -16,17 +17,25 @@ type GameOfLife struct{}
 
 var aliveCount int
 var turn int
+var state gol.State
+var board [][]uint8
+var shut bool
 
 func (g *GameOfLife) GOL(request stubs.GameReq, response *stubs.GameRes) (err error) {
-	tempWorld := make([][]byte, len(request.World))
+	tempWorld := make([][]uint8, len(request.World))
 	for i := range request.World {
-		tempWorld[i] = make([]byte, len(request.World[i]))
+		tempWorld[i] = make([]uint8, len(request.World[i]))
 		copy(tempWorld[i], request.World[i])
 	}
 	for i := 0; i < request.Turns; i++ {
 		aliveCount = len(calculateAliveCells(tempWorld))
 		turn = i
+		board = tempWorld
 		tempWorld = calculateNextState(request.Width, request.Height, request.Threads, tempWorld)
+		//if shut {
+		//	time.Sleep(200 * time.Millisecond)
+		//	os.Exit(0)
+		//}
 	}
 	response.World = tempWorld
 	response.CompletedTurns = request.Turns
@@ -34,10 +43,10 @@ func (g *GameOfLife) GOL(request stubs.GameReq, response *stubs.GameRes) (err er
 	return
 }
 
-func calculateNextState(width int, height int, threads int, world [][]byte) [][]byte {
-	tempWorld := make([][]byte, len(world))
+func calculateNextState(width int, height int, threads int, world [][]uint8) [][]uint8 {
+	tempWorld := make([][]uint8, len(world))
 	for i := range world {
-		tempWorld[i] = make([]byte, len(world[i]))
+		tempWorld[i] = make([]uint8, len(world[i]))
 		copy(tempWorld[i], world[i])
 	}
 
@@ -87,7 +96,7 @@ func countNeighbours(width int, height int, x int, y int, world [][]uint8) int {
 	return count
 }
 
-func worker(wg *sync.WaitGroup, width int, height int, start int, end int, newWorld [][]byte, world [][]byte) {
+func worker(wg *sync.WaitGroup, width int, height int, start int, end int, newWorld [][]uint8, world [][]uint8) {
 	defer wg.Done()
 
 	for y := start; y < end; y++ {
@@ -103,7 +112,7 @@ func worker(wg *sync.WaitGroup, width int, height int, start int, end int, newWo
 	}
 }
 
-func calculateAliveCells(world [][]byte) []util.Cell {
+func calculateAliveCells(world [][]uint8) []util.Cell {
 	var cells []util.Cell
 	for i := range world {
 		for j := range world[i] {
@@ -118,6 +127,23 @@ func calculateAliveCells(world [][]byte) []util.Cell {
 func (g *GameOfLife) GetNumAlive(request stubs.AliveReq, response *stubs.AliveRes) (err error) {
 	response.Turn = turn
 	response.Alive = aliveCount
+	return
+}
+
+func (g *GameOfLife) StateChange(request stubs.ChangeStateReq, response *stubs.ChangeStateRes) (err error) {
+	state = request.State
+	response.Turn = turn
+	return
+}
+
+func (g *GameOfLife) GetBoard(request stubs.BoardReq, response *stubs.BoardRes) (err error) {
+	response.Turn = turn
+	response.World = board
+	return
+}
+
+func (g *GameOfLife) ShutDown(request stubs.CloseReq, response *stubs.CloseRes) (err error) {
+	shut = true
 	return
 }
 
