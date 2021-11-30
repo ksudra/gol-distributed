@@ -5,7 +5,7 @@ import (
 )
 
 var RunGame = "GameOfLife.GOL"
-var AliveCells = "GameOfLife.getNumAlive"
+var AliveCells = "GameOfLife.GetNumAlive"
 
 type GameReq struct {
 	Width   int
