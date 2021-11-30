@@ -7,7 +7,6 @@ import (
 	"net/rpc"
 	"sync"
 	"time"
-	"uk.ac.bris.cs/gameoflife/gol"
 
 	"uk.ac.bris.cs/gameoflife/stubs"
 	"uk.ac.bris.cs/gameoflife/util"
@@ -17,7 +16,7 @@ type GameOfLife struct{}
 
 var aliveCount int
 var turn int
-var state gol.State
+var state int
 var board [][]uint8
 var shut bool
 

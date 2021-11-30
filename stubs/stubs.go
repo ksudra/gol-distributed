@@ -1,7 +1,6 @@
 package stubs
 
 import (
-	"uk.ac.bris.cs/gameoflife/gol"
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -45,7 +44,7 @@ type BoardRes struct {
 }
 
 type ChangeStateReq struct {
-	State gol.State
+	State int
 }
 
 type ChangeStateRes struct {

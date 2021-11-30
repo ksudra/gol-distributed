@@ -99,7 +99,7 @@ func getAliveCells(ticker *time.Ticker, c distributorChannels, client *rpc.Clien
 	}
 }
 
-func changeState(state State, client *rpc.Client, newState State, c distributorChannels) {
+func changeState(state int, client *rpc.Client, newState State, c distributorChannels) {
 	request := stubs.ChangeStateReq{
 		State: state,
 	}
@@ -113,8 +113,6 @@ func changeState(state State, client *rpc.Client, newState State, c distributorC
 		CompletedTurns: response.Turn,
 		NewState:       newState,
 	}
-
-	state = newState
 }
 
 func keyPresses(keyChan <-chan rune, p Params, c distributorChannels, client *rpc.Client) {
