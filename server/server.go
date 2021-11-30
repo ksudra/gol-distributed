@@ -120,7 +120,7 @@ func calculateAliveCells(world [][]byte) []util.Cell {
 	return cells
 }
 
-func (g *GameOfLife) getNumAlive(request stubs.AliveReq, response *stubs.AliveRes) (err error) {
+func (g *GameOfLife) GetNumAlive(request stubs.AliveReq, response *stubs.AliveRes) (err error) {
 	//mutex.Lock()
 	response.Turn = turn
 	response.Alive = aliveCount
