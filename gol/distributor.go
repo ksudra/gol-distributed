@@ -34,6 +34,7 @@ func distributor(p Params, c distributorChannels, keyPress <-chan rune) {
 	defer client.Close()
 
 	go getAliveCells(ticker, c, client)
+	//absolutely shreds test speed
 	go keyPresses(keyPress, p, c, client)
 	makeCall(client, p, c, world, turn)
 	ticker.Stop()
